@@ -30,14 +30,14 @@ graph TD
     A --> F(DefaultConfiguration);
     A --> G((DSLContext Bean));
 
-    B -.->|트랜잭션 연동 래핑| C;
-    C -.->|Connection 관리 위임| D;
-    E -.->|@Transactional 동기화| F;
-    D -.->|커넥션 공급| F;
+    B -.->|"트랜잭션 연동 래핑"| C;
+    C -.->|"Connection 관리 위임"| D;
+    E -.->|"@Transactional 동기화"| F;
+    D -.->|"커넥션 공급"| F;
     
-    F ==>|최종 조립| G;
+    F ==>|"최종 조립"| G;
     
-    User(개발자 Service Layer) --->|@Autowired / 생성자 주입| G;
+    User("개발자 Service Layer") --->|"@Autowired / 생성자 주입"| G;
 
     style G fill:#f96,stroke:#333,stroke-width:4px
 ```
