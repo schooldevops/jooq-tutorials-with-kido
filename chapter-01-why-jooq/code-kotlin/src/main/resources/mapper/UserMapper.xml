@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.UserMapper">
+
+    <!-- 고의적인 오타: e_mail이라는 컬럼은 존재하지 않음 -->
+    <select id="findByEmail" resultType="com.example.domain.User">
+        SELECT id, e_mail, name
+        FROM users
+        WHERE email = #{email}
+    </select>
+</mapper>
