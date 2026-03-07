@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: chapter-07-update-delete
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jooq_demo
+    username: postgres
+    password: postgres
+  jooq:
+    sql-dialect: Postgres
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
