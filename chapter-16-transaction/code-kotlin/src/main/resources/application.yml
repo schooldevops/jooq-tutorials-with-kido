@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: chapter-16-transaction
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jooq_demo
+    username: postgres
+    password: postgres
+  jooq:
+    sql-dialect: Postgres
