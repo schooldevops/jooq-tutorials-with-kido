@@ -28,7 +28,7 @@ public record UserProfileDto(
 ```
 
 ## Step 3: [핵심 1] 단일 쿼리(MultiSet)로 사용자 권한 프로필 조회 (UserQueryRepository.java)
-어플리케이션에서 सबसे 무거운 부분인 "사용자에 매핑된 전체 역할과 권한 트리 다 가져오기"를 쿼리 한 번에 해결합니다.
+어플리케이션에서 무거운 부분인 "사용자에 매핑된 전체 역할과 권한 트리 다 가져오기"를 쿼리 한 번에 해결합니다.
 
 ```java
 public UserProfileDto getUserProfileWithPermissions(String username) {
