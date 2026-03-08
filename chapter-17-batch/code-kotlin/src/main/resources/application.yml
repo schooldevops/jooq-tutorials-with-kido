@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: chapter-17-batch
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jooq_demo?reWriteBatchedInserts=true
+    username: postgres
+    password: postgres
+  jooq:
+    sql-dialect: Postgres
