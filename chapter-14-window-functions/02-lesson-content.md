@@ -55,6 +55,25 @@ fun rankBooksByYearPerAuthor(): List<BookRank> {
 }
 ```
 
+**▶ 실제 실행 SQL:**
+```sql
+SELECT
+  "public"."book"."id",
+  "public"."book"."title",
+  "public"."book"."author_id",
+  "public"."book"."published_year",
+  rank() OVER (
+    PARTITION BY "public"."book"."author_id"
+    ORDER BY "public"."book"."published_year" DESC
+  ) AS "rank_in_author"
+FROM "public"."book"
+ORDER BY
+  "public"."book"."author_id" ASC,
+  "rank_in_author" ASC
+```
+
+> **핵심:** `rank() OVER (PARTITION BY ... ORDER BY ...)` 가 각 행에 순위를 부여합니다. `GROUP BY`와 달리 행이 사라지지 않고 모두 유지됩니다.
+
 ---
 
 ## 3. SUM() OVER - 연도별 누적 출판 수
@@ -74,6 +93,28 @@ public List<YearlyRunningTotal> runningTotalByYear() {
               .fetchInto(YearlyRunningTotal.class);
 }
 ```
+
+**▶ 실제 실행 SQL:**
+```sql
+SELECT
+  "public"."book"."published_year",
+  count(*) AS "book_count",
+  sum(count(*)) OVER (
+    ORDER BY "public"."book"."published_year" ASC
+  ) AS "running_total"
+FROM "public"."book"
+GROUP BY "public"."book"."published_year"
+ORDER BY "public"."book"."published_year" ASC
+```
+
+> **핵심:** `GROUP BY`로 연도별 책 수(`count(*)`)를 집계하면서, 동시에 `sum(count(*)) OVER (ORDER BY year)`로 누적합을 계산합니다. 결과 예:
+>
+> | published_year | book_count | running_total |
+> |---:|---:|---:|
+> | 2000 | 1 | 1 |
+> | 2005 | 1 | 2 |
+> | 2010 | 1 | 3 |
+> | 2020 | 1 | 4 |
 
 ---
 
@@ -100,14 +141,41 @@ public List<BookRank> findTopRankedBookPerAuthor() {
 }
 ```
 
+**▶ 실제 실행 SQL:**
+```sql
+WITH "ranked"("id", "title", "author_id", "published_year", "rank_in_author") AS (
+  SELECT
+    "public"."book"."id",
+    "public"."book"."title",
+    "public"."book"."author_id",
+    "public"."book"."published_year",
+    rank() OVER (
+      PARTITION BY "public"."book"."author_id"
+      ORDER BY "public"."book"."published_year" DESC
+    ) AS "rank_in_author"
+  FROM "public"."book"
+)
+SELECT
+  "ranked"."id",
+  "ranked"."title",
+  "ranked"."author_id",
+  "ranked"."published_year",
+  "ranked"."rank_in_author"
+FROM "ranked"
+WHERE "ranked"."rank_in_author" = 1
+ORDER BY "ranked"."author_id"
+```
+
+> **핵심:** PostgreSQL 윈도우 함수 결과는 WHERE 절에서 직접 필터링할 수 없습니다. CTE로 RANK 결과를 감싸야 `WHERE rank_in_author = 1` 필터를 사용할 수 있습니다.
+
 ---
 
 ## 5. 윈도우 함수 비교표
 
-| 함수 | 용도 | jOOQ 메서드 |
-|------|------|------------|
-| `RANK()` | 동점 시 순위 건너뜀 (1,1,3) | `DSL.rank().over(...)` |
-| `DENSE_RANK()` | 동점 시 순위 연속 (1,1,2) | `DSL.denseRank().over(...)` |
-| `ROW_NUMBER()` | 순서 기준 고유 번호 | `DSL.rowNumber().over(...)` |
-| `SUM/AVG/MAX` | 누적 집계 | `DSL.sum(f).over().orderBy(...)` |
-| `LAG/LEAD` | 이전/다음 행 참조 | `DSL.lag(f).over(...)` |
+| 함수 | 용도 | jOOQ 메서드 | SQL 패턴 |
+|------|------|------------|---------|
+| `RANK()` | 동점 시 순위 건너뜀 (1,1,3) | `DSL.rank().over(...)` | `rank() OVER (PARTITION BY ... ORDER BY ...)` |
+| `DENSE_RANK()` | 동점 시 순위 연속 (1,1,2) | `DSL.denseRank().over(...)` | `dense_rank() OVER (...)` |
+| `ROW_NUMBER()` | 순서 기준 고유 번호 | `DSL.rowNumber().over(...)` | `row_number() OVER (...)` |
+| `SUM/AVG/MAX` | 누적 집계 | `DSL.sum(f).over().orderBy(...)` | `sum(f) OVER (ORDER BY ...)` |
+| `LAG/LEAD` | 이전/다음 행 참조 | `DSL.lag(f).over(...)` | `lag(f) OVER (ORDER BY ...)` |
