@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: demo
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jooq.JooqAutoConfiguration
+  datasource:
+    legacy:
+      jdbc-url: jdbc:postgresql://localhost:5432/jooq_migration_legacy
+      username: postgres
+      password: postgres
+      driver-class-name: org.postgresql.Driver
+    target:
+      jdbc-url: jdbc:postgresql://localhost:5432/jooq_migration_target
+      username: postgres
+      password: postgres
+      driver-class-name: org.postgresql.Driver
+  jooq:
+    sql-dialect: Postgres
