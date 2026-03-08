@@ -71,7 +71,7 @@ jooq {
 					database {
 						name = 'org.jooq.meta.postgres.PostgresDatabase'
 						inputSchema = 'public'
-						includes = '.*'
+						includes = '.*'  
 						excludes = 'flyway_schema_history | spatial_ref_sys'
 					}
 					generate {
