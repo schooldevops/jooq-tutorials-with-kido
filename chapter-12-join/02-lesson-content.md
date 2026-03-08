@@ -59,6 +59,24 @@ fun findBooksWithAuthor(): List<BookWithAuthor> =
 
 > **핵심:** `author_id`가 NULL인 책은 결과에서 제외됩니다.
 
+```sql
+-- jOOQ가 만드는 SQL (예시)
+select
+  book.id,
+  book.title,
+  book.published_year,
+  author.first_name,
+  author.last_name
+from book
+join author
+  on book.author_id = author.id
+order by book.title asc;
+```
+
+> 코드 → SQL 매핑:
+> `.join(AUTHOR).on(BOOK.AUTHOR_ID.eq(AUTHOR.ID))` → `JOIN author ON book.author_id = author.id`
+> `.orderBy(BOOK.TITLE.asc())` → `ORDER BY book.title ASC`
+
 ---
 
 ## 3. LEFT JOIN - 저자 없는 책도 포함
@@ -79,6 +97,23 @@ public List<BookWithAuthor> findAllBooksWithAuthor() {
 
 > **핵심:** `author_id`가 NULL인 책도 포함, `firstName/lastName`은 `null`이 됩니다.
 
+```sql
+-- jOOQ가 만드는 SQL (예시)
+select
+  book.id,
+  book.title,
+  book.published_year,
+  author.first_name,
+  author.last_name
+from book
+left join author
+  on book.author_id = author.id
+order by book.title asc;
+```
+
+> 코드 → SQL 매핑:
+> `.leftJoin(AUTHOR).on(BOOK.AUTHOR_ID.eq(AUTHOR.ID))` → `LEFT JOIN author ON book.author_id = author.id`
+
 ---
 
 ## 4. JOIN + WHERE 필터링
@@ -97,6 +132,24 @@ public List<BookWithAuthor> findBooksAfterYearWithAuthor(int year) {
             .fetchInto(BookWithAuthor.class);
 }
 ```
+
+```sql
+-- jOOQ가 만드는 SQL (예시)
+select
+  book.id,
+  book.title,
+  book.published_year,
+  author.first_name,
+  author.last_name
+from book
+join author
+  on book.author_id = author.id
+where book.published_year >= ?
+order by book.published_year asc;
+```
+
+> 코드 → SQL 매핑:
+> `.where(BOOK.PUBLISHED_YEAR.ge(year))` → `WHERE book.published_year >= ?` (바인딩 변수)
 
 ---
 

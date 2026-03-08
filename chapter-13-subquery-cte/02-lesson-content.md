@@ -11,13 +11,12 @@
 ```java
 // Java: Scalar Subquery
 public List<Book> findBooksAboveAvgYear() {
-    // 서브쿼리: 전체 평균 출판연도
-    var avgYear = DSL.select(DSL.avg(BOOK.PUBLISHED_YEAR))
-                     .from(BOOK)
-                     .asField("avg_year");
+    var avgYearSubquery = DSL.select(DSL.avg(BOOK.PUBLISHED_YEAR)).from(BOOK);
 
     return dsl.selectFrom(BOOK)
-              .where(BOOK.PUBLISHED_YEAR.gt(avgYear))
+              .where(BOOK.PUBLISHED_YEAR.gt(
+                  DSL.coerce(avgYearSubquery.asField(), Integer.class)
+              ))
               .orderBy(BOOK.PUBLISHED_YEAR.desc())
               .fetchInto(Book.class);
 }
@@ -26,18 +25,33 @@ public List<Book> findBooksAboveAvgYear() {
 ```kotlin
 // Kotlin: Scalar Subquery
 fun findBooksAboveAvgYear(): List<Book> {
-    val avgYear = DSL.select(DSL.avg(BOOK.PUBLISHED_YEAR))
-                     .from(BOOK)
-                     .asField<BigDecimal>("avg_year")
+    val avgYearSubquery = DSL.select(DSL.avg(BOOK.PUBLISHED_YEAR)).from(BOOK)
 
     return dsl.selectFrom(BOOK)
-        .where(BOOK.PUBLISHED_YEAR.gt(avgYear))
+        .where(BOOK.PUBLISHED_YEAR.gt(
+            DSL.coerce(avgYearSubquery.asField<BigDecimal>(), Int::class.java)
+        ))
         .orderBy(BOOK.PUBLISHED_YEAR.desc())
         .fetchInto(Book::class.java)
 }
 ```
 
-> **핵심:** `DSL.select(...).from(...).asField("별칭")` 으로 서브쿼리를 필드처럼 사용합니다.
+**▶ 실제 실행 SQL:**
+```sql
+SELECT
+  "public"."book"."id",
+  "public"."book"."title",
+  "public"."book"."author_id",
+  "public"."book"."published_year"
+FROM "public"."book"
+WHERE "public"."book"."published_year" > (
+  SELECT avg("public"."book"."published_year")
+  FROM "public"."book"
+)
+ORDER BY "public"."book"."published_year" DESC
+```
+
+> **핵심:** 서브쿼리가 WHERE 조건 안에 인라인으로 삽입됩니다. 매 쿼리 실행 시 서브쿼리가 먼저 평가되어 단일 값(평균)을 반환합니다.
 
 ---
 
@@ -52,7 +66,6 @@ flowchart TD
 ```java
 // Java: CTE with()
 public List<AuthorBookCount> findAuthorsWithBookCount() {
-    // CTE 정의
     var bookCountCte = DSL.name("book_count").fields("author_id", "cnt")
             .as(DSL.select(BOOK.AUTHOR_ID, DSL.count().as("cnt"))
                    .from(BOOK)
@@ -70,6 +83,28 @@ public List<AuthorBookCount> findAuthorsWithBookCount() {
 }
 ```
 
+**▶ 실제 실행 SQL:**
+```sql
+WITH "book_count"("author_id", "cnt") AS (
+  SELECT
+    "public"."book"."author_id",
+    count(*) AS "cnt"
+  FROM "public"."book"
+  GROUP BY "public"."book"."author_id"
+)
+SELECT
+  "public"."author"."id",
+  "public"."author"."first_name",
+  "public"."author"."last_name",
+  "book_count"."cnt"
+FROM "book_count"
+JOIN "public"."author"
+  ON "public"."author"."id" = "book_count"."author_id"
+ORDER BY "cnt" DESC
+```
+
+> **핵심:** `WITH ... AS (...)` 절이 맨 앞에 정의되고, 메인 쿼리에서 `"book_count"`를 마치 테이블처럼 참조합니다.
+
 ---
 
 ## 3. CTE + JOIN - 최신 책 조회
@@ -77,7 +112,6 @@ public List<AuthorBookCount> findAuthorsWithBookCount() {
 ```java
 // Java: CTE + JOIN
 public List<RecentBook> findRecentBooksPerAuthor() {
-    // CTE: 저자별 최신 출판연도
     var maxYearCte = DSL.name("max_year").fields("author_id", "max_y")
             .as(DSL.select(BOOK.AUTHOR_ID, DSL.max(BOOK.PUBLISHED_YEAR).as("max_y"))
                    .from(BOOK)
@@ -98,15 +132,42 @@ public List<RecentBook> findRecentBooksPerAuthor() {
 }
 ```
 
+**▶ 실제 실행 SQL:**
+```sql
+WITH "max_year"("author_id", "max_y") AS (
+  SELECT
+    "public"."book"."author_id",
+    max("public"."book"."published_year") AS "max_y"
+  FROM "public"."book"
+  GROUP BY "public"."book"."author_id"
+)
+SELECT
+  "public"."book"."id",
+  "public"."book"."title",
+  "public"."book"."author_id",
+  "public"."book"."published_year",
+  "public"."author"."first_name",
+  "public"."author"."last_name"
+FROM "public"."book"
+JOIN "public"."author"
+  ON "public"."book"."author_id" = "public"."author"."id"
+JOIN "max_year"
+  ON "public"."book"."author_id" = "max_year"."author_id"
+  AND "public"."book"."published_year" = "max_year"."max_y"
+ORDER BY "public"."author"."last_name" ASC
+```
+
+> **핵심:** CTE `max_year`에서 저자별 최신 연도를 미리 계산한 뒤, 메인 쿼리에서 `JOIN "max_year"` 로 결합합니다. 조건이 author_id와 published_year 두 개 모두 일치할 때만 결과에 포함됩니다.
+
 ---
 
 ## 4. 세 가지 기법 비교
 
-| 기법 | 용도 | jOOQ 메서드 |
-|------|------|------------|
-| **Scalar Subquery** | WHERE 절에 단일 값 서브쿼리 | `.asField("alias")` |
-| **CTE (with)** | 복잡 쿼리를 이름 붙여 분리 | `dsl.with(cte).select(...)` |
-| **CTE + JOIN** | CTE 결과를 메인 쿼리와 결합 | `.join(cte).on(...)` |
+| 기법 | 용도 | jOOQ 메서드 | SQL 패턴 |
+|------|------|------------|---------|
+| **Scalar Subquery** | WHERE 절에 단일 값 서브쿼리 | `.asField("alias")` | `WHERE col > (SELECT ...)` |
+| **CTE (with)** | 복잡 쿼리를 이름 붙여 분리 | `dsl.with(cte).select(...)` | `WITH name AS (...) SELECT ...` |
+| **CTE + JOIN** | CTE 결과를 메인 쿼리와 결합 | `.join(cte).on(...)` | `WITH ... JOIN cte ON ...` |
 
 ---
 
